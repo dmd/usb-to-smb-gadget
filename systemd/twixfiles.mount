@@ -1,0 +1,13 @@
+[Unit]
+Description=CIFS mount for ${SMB_SERVER}
+After=network-online.target
+Wants=network-online.target
+
+[Mount]
+What=${SMB_SERVER}
+Where=/twixfiles
+Type=cifs
+Options=credentials=/root/.mountcreds,iocharset=utf8,vers=3.0,_netdev,nofail
+
+[Install]
+WantedBy=multi-user.target

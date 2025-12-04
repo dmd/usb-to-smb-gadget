@@ -1,0 +1,8 @@
+[Unit]
+Description=Rsync disk.img contents to /twixfiles
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/twix-rsync
+User=root
+Group=root

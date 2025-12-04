@@ -1,0 +1,14 @@
+# Network Storage Configuration
+# NFS server path for disk image storage (format: server:/path)
+NFS_SERVER="fileserver:/path/to/share/twiximage"
+
+# SMB/CIFS server path for file access (format: //server/share)
+SMB_SERVER="//fileserver/twixfiles"
+
+# SMB credentials
+SMB_USERNAME="the-username"
+SMB_PASSWORD="the-password"
+SMB_DOMAIN="the-domain"
+
+# Disk image size (e.g., 250G, 500G, 1T)
+DISK_SIZE="250G"

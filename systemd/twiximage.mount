@@ -1,0 +1,13 @@
+[Unit]
+Description=Persistent NFS mount for twiximage
+After=network-online.target
+Wants=network-online.target
+
+[Mount]
+What=${NFS_SERVER}
+Where=/twiximage
+Type=nfs4
+Options=_netdev,rw,noatime
+
+[Install]
+WantedBy=multi-user.target

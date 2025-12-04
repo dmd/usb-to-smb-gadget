@@ -1,0 +1,67 @@
+#!/bin/bash
+set -euo pipefail
+
+IMG=/twiximage/disk.img        # backing image used by g_mass_storage
+MNT=/mnt/diskimg               # temporary mountpoint for the image
+DEST=/twixfiles                # destination SMB share
+IDLE_WINDOW=60                 # seconds of no writes before we sync
+LOCKFILE=/run/twix-rsync.lock
+
+IMGDIR=$(dirname "$IMG")
+if ! findmnt -rn -t nfs,nfs4 "$IMGDIR" >/dev/null 2>&1; then
+    echo "$IMGDIR not NFS-mounted, skipping" >&2
+    exit 1
+fi
+
+if ! findmnt -rn $DEST >/dev/null 2>&1; then
+    echo "$DEST not mounted, skipping" >&2
+    exit 1
+fi
+
+# Ensure the image exists
+if [[ ! -f "$IMG" ]]; then
+    exit 1
+fi
+
+# Check if the image has been idle (no mtime change) for IDLE_WINDOW seconds.
+# If not, bail out quietly and try again on the next timer tick.
+now=$(date +%s)
+img_mtime=$(stat -c %Y "$IMG" 2>/dev/null || echo 0)
+
+# If stat failed or time difference is too small, skip.
+if (( img_mtime == 0 )) || (( now - img_mtime < IDLE_WINDOW )); then
+    echo "$IMG is not idle"
+    exit 0
+fi
+
+
+# Serialize runs in case the timer fires again while we're still syncing.
+exec 9>"$LOCKFILE"
+if ! flock -n 9; then
+    # Another twix-rsync is already running.
+    exit 0
+fi
+
+mkdir -p "$MNT"
+
+LOOP=$(losetup --show -fP "$IMG")
+
+cleanup() {
+    if mountpoint -q "$MNT"; then
+        umount "$MNT" || true
+    fi
+    if [[ -n "${LOOP:-}" ]] && losetup "$LOOP" &>/dev/null; then
+        losetup -d "$LOOP" || true
+    fi
+}
+trap cleanup EXIT
+
+
+# Mount the filesystem read-only.
+# If the image has a partition table, this will usually be "$LOOP"p1;
+# if not, the plain "$LOOP" will work.
+if ! mount -o ro "${LOOP}"p1 "$MNT" 2>/dev/null; then
+    mount -o ro "$LOOP" "$MNT"
+fi
+
+rsync -a "$MNT"/ "$DEST"/
