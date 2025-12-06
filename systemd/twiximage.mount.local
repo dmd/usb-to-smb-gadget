@@ -1,0 +1,12 @@
+[Unit]
+Description=Local USB disk for TWIX image storage
+After=local-fs.target
+
+[Mount]
+What=/dev/disk/by-label/${LOCAL_DISK_LABEL}
+Where=/twiximage
+Type=auto
+Options=rw,noatime
+
+[Install]
+WantedBy=multi-user.target

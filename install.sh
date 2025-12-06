@@ -66,16 +66,36 @@ check_config() {
     # shellcheck source=/dev/null
     source "$CONFIG_FILE"
 
-    # Verify required variables
-    local required_vars=(NFS_SERVER SMB_SERVER SMB_USERNAME SMB_PASSWORD SMB_DOMAIN DISK_SIZE)
+    # Verify required variables for all storage types
+    local required_vars=(SMB_SERVER SMB_USERNAME SMB_PASSWORD SMB_DOMAIN DISK_SIZE STORAGE_TYPE)
     for var in "${required_vars[@]}"; do
         if [[ -z "${!var:-}" ]]; then
             fatal "Required variable $var not set in config file"
         fi
     done
 
+    # Validate STORAGE_TYPE and its dependencies
+    case "$STORAGE_TYPE" in
+        nfs)
+            if [[ -z "${NFS_SERVER:-}" ]]; then
+                fatal "STORAGE_TYPE=nfs requires NFS_SERVER to be set"
+            fi
+            ;;
+        local)
+            if [[ -z "${LOCAL_DISK_LABEL:-}" ]]; then
+                fatal "STORAGE_TYPE=local requires LOCAL_DISK_LABEL to be set"
+            fi
+            if [[ ! -e "/dev/disk/by-label/${LOCAL_DISK_LABEL}" ]]; then
+                fatal "USB disk with label '${LOCAL_DISK_LABEL}' not found.\nPrepare the disk first: sudo e2label /dev/sdX1 ${LOCAL_DISK_LABEL}"
+            fi
+            ;;
+        *)
+            fatal "STORAGE_TYPE must be 'nfs' or 'local', got: $STORAGE_TYPE"
+            ;;
+    esac
+
     # Export variables so envsubst can see them
-    export NFS_SERVER SMB_SERVER SMB_USERNAME SMB_PASSWORD SMB_DOMAIN DISK_SIZE
+    export NFS_SERVER SMB_SERVER SMB_USERNAME SMB_PASSWORD SMB_DOMAIN DISK_SIZE STORAGE_TYPE LOCAL_DISK_LABEL
 }
 
 # Test NFS mount
@@ -127,15 +147,21 @@ EOF
 install_systemd_units() {
     info "Installing systemd units..."
 
-    # Process templates with envsubst
-    for unit in twiximage.mount twixfiles.mount; do
-        local source_file="${SCRIPT_DIR}/systemd/${unit}"
-        if [[ ! -f "$source_file" ]]; then
-            fatal "Source file not found: $source_file"
-        fi
-        envsubst < "$source_file" > "/etc/systemd/system/${unit}"
-        info "Installed /etc/systemd/system/${unit}"
-    done
+    # Select twiximage.mount template based on STORAGE_TYPE
+    local twiximage_template="${SCRIPT_DIR}/systemd/twiximage.mount.${STORAGE_TYPE}"
+    if [[ ! -f "$twiximage_template" ]]; then
+        fatal "Template not found: $twiximage_template"
+    fi
+    envsubst < "$twiximage_template" > "/etc/systemd/system/twiximage.mount"
+    info "Installed /etc/systemd/system/twiximage.mount (from ${STORAGE_TYPE} template)"
+
+    # Process twixfiles.mount template
+    local twixfiles_source="${SCRIPT_DIR}/systemd/twixfiles.mount"
+    if [[ ! -f "$twixfiles_source" ]]; then
+        fatal "Source file not found: $twixfiles_source"
+    fi
+    envsubst < "$twixfiles_source" > "/etc/systemd/system/twixfiles.mount"
+    info "Installed /etc/systemd/system/twixfiles.mount"
 
     # Copy static units
     for unit in usb-gadget.service twix-rsync.service twix-rsync.timer; do
@@ -187,7 +213,7 @@ create_mount_dirs() {
 create_disk_image() {
     info "Creating disk image..."
 
-    # Mount NFS first
+    # Mount storage (NFS or local USB) first
     systemctl daemon-reload
     systemctl enable --now twiximage.mount
 
@@ -355,7 +381,11 @@ main() {
     check_config
 
     info "[2/6] Validating network mounts..."
-    test_nfs_mount
+    if [[ "$STORAGE_TYPE" == "nfs" ]]; then
+        test_nfs_mount
+    else
+        info "Skipping NFS test (STORAGE_TYPE=$STORAGE_TYPE)"
+    fi
     test_smb_mount
 
     info "[3/6] Installing files..."

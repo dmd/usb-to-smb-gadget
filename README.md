@@ -11,12 +11,48 @@ This system makes a Raspberry Pi appear as a USB mass storage device to the scan
 - Raspberry Pi 4B with Raspberry Pi OS (64-bit)
   - Use the [Raspberry Pi Imager](https://www.raspberrypi.com/software/) to image an SD card with a standard 64-bit Raspberry Pi OS image. Let it create a user account for you.
 
-- NFS share configured on your file server for disk image storage
-  - Note that if you do things this way you're actually sending all data over the network **three times**. It would be much better and simpler to use a locally attached SSD.
+- **Storage option A: Local USB disk** (recommended for performance)
+  - USB disk attached to the Pi, must be formatted and labeled before installation (see below)
 
-- SMB/CIFS share configured on your file server for file access
+- **Storage option B: NFS share** for disk image storage
+  - Note: This sends data over the network three times. Consider local USB for better performance.
+
+- SMB/CIFS share configured on your file server for synced file access
 - [USB-C power splitter](https://www.pishop.us/product/usb-c-pwr-splitter-without-barrel-jack/)
   - This is needed because we need to power the Pi via the USB-C port, but also use it as the port connected to the scanner. This splitter makes sure power from the power supply does not feed into the scanner console's USB port.
+
+
+## Preparing Local USB Storage (if using STORAGE_TYPE=local)
+
+If using a locally attached USB disk instead of NFS:
+
+1. **Identify the USB disk:**
+   ```bash
+   lsblk
+   ```
+   Find your USB disk (e.g., `/dev/sda`)
+
+2. **Partition the disk** (if needed):
+   ```bash
+   sudo fdisk /dev/sda
+   # Create a single partition using all space
+   ```
+
+3. **Format as ext4:**
+   ```bash
+   sudo mkfs.ext4 /dev/sda1
+   ```
+
+4. **Label the partition:**
+   ```bash
+   sudo e2label /dev/sda1 TWIXIMAGE
+   ```
+
+5. **Verify the label:**
+   ```bash
+   ls -la /dev/disk/by-label/
+   # Should show TWIXIMAGE -> ../../sda1
+   ```
 
 
 ## Installation
@@ -29,7 +65,9 @@ nano config
 ```
 
 Edit with your site-specific values:
-- NFS server path (e.g., `fileserver:/volume1/twiximage`)
+- **Storage type**: Choose `nfs` or `local`
+- If `local`: Set `LOCAL_DISK_LABEL` (e.g., `TWIXIMAGE`)
+- If `nfs`: Set `NFS_SERVER` (e.g., `fileserver:/volume1/twiximage`)
 - SMB server path (e.g., `//fileserver/twixfiles`)
 - SMB credentials (username, password, domain)
 - Disk size (default 250G)

@@ -1,7 +1,18 @@
-# Network Storage Configuration
-# NFS server path for disk image storage (format: server:/path)
+# === Storage Configuration ===
+# Choose where disk.img is stored:
+#   "nfs"   - On NFS share (requires NFS_SERVER)
+#   "local" - On locally attached USB disk (requires LOCAL_DISK_LABEL)
+STORAGE_TYPE="nfs"
+
+# NFS storage (required if STORAGE_TYPE=nfs)
 NFS_SERVER="fileserver:/path/to/share/twiximage"
 
+# Local USB storage (required if STORAGE_TYPE=local)
+# The USB disk must be pre-formatted and labeled before running install.sh
+# Example: sudo e2label /dev/sdX1 TWIXIMAGE
+LOCAL_DISK_LABEL="TWIXIMAGE"
+
+# === SMB Configuration (always required) ===
 # SMB/CIFS server path for file access (format: //server/share)
 SMB_SERVER="//fileserver/twixfiles"
 
@@ -10,5 +21,6 @@ SMB_USERNAME="the-username"
 SMB_PASSWORD="the-password"
 SMB_DOMAIN="the-domain"
 
+# === Disk Image Configuration ===
 # Disk image size (e.g., 250G, 500G, 1T)
 DISK_SIZE="250G"
