@@ -194,4 +194,4 @@ Based on thagrol's [USB Mass Storage Gadget Beginner's Guide](https://github.com
 
 ## License
 
-This project is provided as-is for educational and research purposes.
+This project is released into the public domain under the [Unlicense](LICENSE).
