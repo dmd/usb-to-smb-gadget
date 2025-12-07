@@ -177,7 +177,6 @@ A better way of triggering rsync would be to have it run when the device is unmo
 ```
 .
 ├── README.md             # This file
-├── usb-gadget.md         # Detailed documentation
 ├── install.sh            # Installation script
 ├── config.example        # Configuration template
 ├── systemd/              # Systemd unit files
