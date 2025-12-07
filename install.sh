@@ -147,24 +147,24 @@ EOF
 install_systemd_units() {
     info "Installing systemd units..."
 
-    # Select twiximage.mount template based on STORAGE_TYPE
-    local twiximage_template="${SCRIPT_DIR}/systemd/twiximage.mount.${STORAGE_TYPE}"
-    if [[ ! -f "$twiximage_template" ]]; then
-        fatal "Template not found: $twiximage_template"
+    # Select diskimage.mount template based on STORAGE_TYPE
+    local diskimage_template="${SCRIPT_DIR}/systemd/diskimage.mount.${STORAGE_TYPE}"
+    if [[ ! -f "$diskimage_template" ]]; then
+        fatal "Template not found: $diskimage_template"
     fi
-    envsubst < "$twiximage_template" > "/etc/systemd/system/twiximage.mount"
-    info "Installed /etc/systemd/system/twiximage.mount (from ${STORAGE_TYPE} template)"
+    envsubst < "$diskimage_template" > "/etc/systemd/system/diskimage.mount"
+    info "Installed /etc/systemd/system/diskimage.mount (from ${STORAGE_TYPE} template)"
 
-    # Process twixfiles.mount template
-    local twixfiles_source="${SCRIPT_DIR}/systemd/twixfiles.mount"
-    if [[ ! -f "$twixfiles_source" ]]; then
-        fatal "Source file not found: $twixfiles_source"
+    # Process usbfiles.mount template
+    local usbfiles_source="${SCRIPT_DIR}/systemd/usbfiles.mount"
+    if [[ ! -f "$usbfiles_source" ]]; then
+        fatal "Source file not found: $usbfiles_source"
     fi
-    envsubst < "$twixfiles_source" > "/etc/systemd/system/twixfiles.mount"
-    info "Installed /etc/systemd/system/twixfiles.mount"
+    envsubst < "$usbfiles_source" > "/etc/systemd/system/usbfiles.mount"
+    info "Installed /etc/systemd/system/usbfiles.mount"
 
     # Copy static units
-    for unit in usb-gadget.service twix-rsync.service twix-rsync.timer; do
+    for unit in usb-gadget.service usb-rsync.service usb-rsync.timer; do
         local source_file="${SCRIPT_DIR}/systemd/${unit}"
         if [[ ! -f "$source_file" ]]; then
             fatal "Source file not found: $source_file"
@@ -178,13 +178,13 @@ install_systemd_units() {
 install_rsync_script() {
     info "Installing rsync script..."
 
-    local source_file="${SCRIPT_DIR}/scripts/twix-rsync"
+    local source_file="${SCRIPT_DIR}/scripts/usb-rsync"
     if [[ ! -f "$source_file" ]]; then
         fatal "Source file not found: $source_file"
     fi
-    cp "$source_file" /usr/local/bin/twix-rsync
-    chmod +x /usr/local/bin/twix-rsync
-    info "Installed /usr/local/bin/twix-rsync"
+    cp "$source_file" /usr/local/bin/usb-rsync
+    chmod +x /usr/local/bin/usb-rsync
+    info "Installed /usr/local/bin/usb-rsync"
 }
 
 # Generate mount credentials file
@@ -204,9 +204,9 @@ EOF
 create_mount_dirs() {
     info "Creating mount directories..."
 
-    mkdir -p /twiximage
-    mkdir -p /twixfiles
-    info "Created /twiximage and /twixfiles"
+    mkdir -p /diskimage
+    mkdir -p /usbfiles
+    info "Created /diskimage and /usbfiles"
 }
 
 # Create and format disk image
@@ -215,34 +215,34 @@ create_disk_image() {
 
     # Mount storage (NFS or local USB) first
     systemctl daemon-reload
-    systemctl enable --now twiximage.mount
+    systemctl enable --now diskimage.mount
 
     # Wait for mount to complete
     local max_wait=30
     local waited=0
-    while ! mountpoint -q /twiximage && [[ $waited -lt $max_wait ]]; do
-        warn "Waiting for /twiximage mount to complete... ($waited/$max_wait seconds)"
+    while ! mountpoint -q /diskimage && [[ $waited -lt $max_wait ]]; do
+        warn "Waiting for /diskimage mount to complete... ($waited/$max_wait seconds)"
         sleep 1
         ((waited++))
     done
 
-    if ! mountpoint -q /twiximage; then
-        fatal "Mount /twiximage failed to complete within ${max_wait} seconds. Check systemctl status twiximage.mount"
+    if ! mountpoint -q /diskimage; then
+        fatal "Mount /diskimage failed to complete within ${max_wait} seconds. Check systemctl status diskimage.mount"
     fi
 
-    info "Mount /twiximage completed successfully"
+    info "Mount /diskimage completed successfully"
 
     # Check if disk image already exists
-    if [[ -f /twiximage/disk.img ]]; then
-        warn "Disk image /twiximage/disk.img already exists, skipping creation"
+    if [[ -f /diskimage/disk.img ]]; then
+        warn "Disk image /diskimage/disk.img already exists, skipping creation"
         return
     fi
 
     info "Creating ${DISK_SIZE} disk image (this may take a moment)..."
-    truncate -s "$DISK_SIZE" /twiximage/disk.img
+    truncate -s "$DISK_SIZE" /diskimage/disk.img
 
     info "Formatting as exFAT..."
-    mkfs.exfat /twiximage/disk.img
+    mkfs.exfat /diskimage/disk.img
 
     info "Disk image created and formatted"
 }
@@ -254,9 +254,9 @@ enable_services() {
     systemctl daemon-reload
 
     # Enable and start mounts and services
-    systemctl enable --now twixfiles.mount
+    systemctl enable --now usbfiles.mount
     systemctl enable --now usb-gadget.service
-    systemctl enable --now twix-rsync.timer
+    systemctl enable --now usb-rsync.timer
 
     info "Services enabled"
 }
@@ -266,7 +266,7 @@ verify_services() {
     info "Verifying services..."
 
     local failed=0
-    for service in twiximage.mount twixfiles.mount usb-gadget.service twix-rsync.timer; do
+    for service in diskimage.mount usbfiles.mount usb-gadget.service usb-rsync.timer; do
         if systemctl is-active --quiet "$service"; then
             info "✓ $service is active"
         else

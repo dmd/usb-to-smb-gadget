@@ -1,0 +1,8 @@
+[Unit]
+Description=Rsync disk.img contents to /usbfiles
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/usb-rsync
+User=root
+Group=root

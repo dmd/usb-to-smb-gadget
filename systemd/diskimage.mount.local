@@ -1,10 +1,10 @@
 [Unit]
-Description=Local USB disk for TWIX image storage
+Description=Local USB disk for disk image storage
 After=local-fs.target
 
 [Mount]
 What=/dev/disk/by-label/${LOCAL_DISK_LABEL}
-Where=/twiximage
+Where=/diskimage
 Type=auto
 Options=rw,noatime
 

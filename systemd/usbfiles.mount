@@ -1,11 +1,11 @@
 [Unit]
-Description=CIFS mount for ${SMB_SERVER}
+Description=SMB mount for ${SMB_SERVER}
 After=network-online.target
 Wants=network-online.target
 
 [Mount]
 What=${SMB_SERVER}
-Where=/twixfiles
+Where=/usbfiles
 Type=cifs
 Options=credentials=/root/.mountcreds,iocharset=utf8,vers=3.0,_netdev,nofail
 

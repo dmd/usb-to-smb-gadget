@@ -1,10 +1,12 @@
-# Raspberry Pi USB Gadget for TWIX Files
+# Raspberry Pi USB to SMB Gadget
 
-Quick-start installation guide for the McLean Hospital USB gadget system that allows copying TWIX files from Siemens scanners to network storage.
+Suppose you have a computer that has no network access (for whatever reason), but you regularly need to copy files off of it.
 
-## Overview
+This system makes a Raspberry Pi appear as a USB mass storage device. Files copied to this "USB drive" are automatically synced to a network file share.
 
-This system makes a Raspberry Pi appear as a USB mass storage device to the scanner console. Files copied to this "USB drive" are automatically synced to a network file share, eliminating the need for physical USB sticks.
+This is a one-way sync (although it doesn't have to be; that's just what solved our particular problem).
+
+Raspberry Pi gadget mode uses a exFAT *disk image* to write to; but nobody wants to read from that. We store that disk image either on a local USB-attached disk (ideally) or (less so) on an NFS share. Then, periodically and only when the disk image file is quiescent, files from the disk image are rsync'd to a SMB share.
 
 ## Prerequisites
 
@@ -12,7 +14,7 @@ This system makes a Raspberry Pi appear as a USB mass storage device to the scan
   - Use the [Raspberry Pi Imager](https://www.raspberrypi.com/software/) to image an SD card with a standard 64-bit Raspberry Pi OS image. Let it create a user account for you.
 
 - **Storage option A: Local USB disk** (recommended for performance)
-  - USB disk attached to the Pi, must be formatted and labeled before installation (see below)
+  - USB disk attached to the Pi on a USB-A (and hopefully USB3) port, must be formatted and labeled before installation (see below)
 
 - **Storage option B: NFS share** for disk image storage
   - Note: This sends data over the network three times. Consider local USB for better performance.
@@ -20,6 +22,8 @@ This system makes a Raspberry Pi appear as a USB mass storage device to the scan
 - SMB/CIFS share configured on your file server for synced file access
 - [USB-C power splitter](https://www.pishop.us/product/usb-c-pwr-splitter-without-barrel-jack/)
   - This is needed because we need to power the Pi via the USB-C port, but also use it as the port connected to the scanner. This splitter makes sure power from the power supply does not feed into the scanner console's USB port.
+
+- USB-C cord to your host computer (either USB-C on both ends, or USB-C on the Pi end and USB-A on the host end)
 
 
 ## Preparing Local USB Storage (if using STORAGE_TYPE=local)
@@ -45,13 +49,13 @@ If using a locally attached USB disk instead of NFS:
 
 4. **Label the partition:**
    ```bash
-   sudo e2label /dev/sda1 TWIXIMAGE
+   sudo e2label /dev/sda1 DISKIMAGE
    ```
 
 5. **Verify the label:**
    ```bash
    ls -la /dev/disk/by-label/
-   # Should show TWIXIMAGE -> ../../sda1
+   # Should show DISKIMAGE -> ../../sda1
    ```
 
 
@@ -66,9 +70,9 @@ nano config
 
 Edit with your site-specific values:
 - **Storage type**: Choose `nfs` or `local`
-- If `local`: Set `LOCAL_DISK_LABEL` (e.g., `TWIXIMAGE`)
-- If `nfs`: Set `NFS_SERVER` (e.g., `fileserver:/volume1/twiximage`)
-- SMB server path (e.g., `//fileserver/twixfiles`)
+- If `local`: Set `LOCAL_DISK_LABEL` (e.g., `DISKIMAGE`)
+- If `nfs`: Set `NFS_SERVER` (e.g., `fileserver:/diskimage`)
+- SMB server path (e.g., `//fileserver/usbfiles`)
 - SMB credentials (username, password, domain)
 - Disk size (default 250G)
 
@@ -101,8 +105,8 @@ The USB gadget mode requires a reboot to take effect.
 - A new USB drive should appear
 - Copy a test file to the drive
 - Eject the drive
-- Wait ~60 seconds
-- Verify the file appears in your SMB share at `/twixfiles`
+- Wait a while
+- Verify the file appears in your SMB share at `/usbfiles`
 
 ### 5. Enable read-only mode (after testing)
 
@@ -126,29 +130,29 @@ This makes the Pi resistant to power failures and unexpected disconnections. If 
 
 Check service status:
 ```bash
-sudo systemctl status twiximage.mount
-sudo systemctl status twixfiles.mount
+sudo systemctl status diskimage.mount
+sudo systemctl status usbfiles.mount
 sudo systemctl status usb-gadget.service
-sudo systemctl status twix-rsync.timer
+sudo systemctl status usb-rsync.timer
 ```
 
 Check logs:
 ```bash
-sudo journalctl -u twiximage.mount -n 50
-sudo journalctl -u twix-rsync.service -n 50
+sudo journalctl -u diskimage.mount -n 50
+sudo journalctl -u usb-rsync.service -n 50
 ```
 
 ### Files not syncing
 
 Check that rsync is running:
 ```bash
-sudo systemctl status twix-rsync.timer
-sudo journalctl -u twix-rsync.service -f
+sudo systemctl status usb-rsync.timer
+sudo journalctl -u usb-rsync.service -f
 ```
 
 Manually trigger a sync:
 ```bash
-sudo systemctl start twix-rsync.service
+sudo systemctl start usb-rsync.service
 ```
 
 ### Network mount issues
@@ -156,10 +160,10 @@ sudo systemctl start twix-rsync.service
 Test mounts manually:
 ```bash
 # Test NFS
-sudo mount -t nfs4 fileserver:/path/to/share /mnt
+sudo mount -t nfs4 fileserver:/diskimage /mnt
 
 # Test SMB
-sudo mount -t cifs //fileserver/share /mnt -o credentials=/root/.mountcreds
+sudo mount -t cifs //fileserver/usbfiles /mnt -o credentials=/root/.mountcreds
 ```
 
 ## Other Notes
@@ -177,13 +181,13 @@ A better way of triggering rsync would be to have it run when the device is unmo
 ├── install.sh            # Installation script
 ├── config.example        # Configuration template
 ├── systemd/              # Systemd unit files
-│   ├── twiximage.mount
-│   ├── twixfiles.mount
+│   ├── diskimage.mount
+│   ├── usbfiles.mount
 │   ├── usb-gadget.service
-│   ├── twix-rsync.service
-│   └── twix-rsync.timer
+│   ├── usb-rsync.service
+│   └── usb-rsync.timer
 └── scripts/
-    └── twix-rsync        # Sync script
+    └── usb-rsync         # Sync script
 ```
 
 ## Credits

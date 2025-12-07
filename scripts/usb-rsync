@@ -1,15 +1,15 @@
 #!/bin/bash
 set -euo pipefail
 
-IMG=/twiximage/disk.img        # backing image used by g_mass_storage
+IMG=/diskimage/disk.img        # backing image used by g_mass_storage
 MNT=/mnt/diskimg               # temporary mountpoint for the image
-DEST=/twixfiles                # destination SMB share
+DEST=/usbfiles                # destination SMB share
 IDLE_WINDOW=60                 # seconds of no writes before we sync
-LOCKFILE=/run/twix-rsync.lock
+LOCKFILE=/run/usb-rsync.lock
 
 IMGDIR=$(dirname "$IMG")
-if ! findmnt -rn -t nfs,nfs4 "$IMGDIR" >/dev/null 2>&1; then
-    echo "$IMGDIR not NFS-mounted, skipping" >&2
+if ! findmnt -rn "$IMGDIR" >/dev/null 2>&1; then
+    echo "$IMGDIR not mounted, skipping" >&2
     exit 1
 fi
 
@@ -38,7 +38,7 @@ fi
 # Serialize runs in case the timer fires again while we're still syncing.
 exec 9>"$LOCKFILE"
 if ! flock -n 9; then
-    # Another twix-rsync is already running.
+    # Another usb-rsync is already running.
     exit 0
 fi
 

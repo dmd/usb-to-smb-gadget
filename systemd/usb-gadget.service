@@ -1,14 +1,14 @@
 [Unit]
-Description=USB mass storage gadget for /twiximage/disk.img
+Description=USB mass storage gadget for /diskimage/disk.img
 After=network-online.target remote-fs.target
-RequiresMountsFor=/twiximage
-ConditionPathIsMountPoint=/twiximage
-ConditionPathExists=/twiximage/disk.img
+RequiresMountsFor=/diskimage
+ConditionPathIsMountPoint=/diskimage
+ConditionPathExists=/diskimage/disk.img
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/sbin/modprobe g_mass_storage file=/twiximage/disk.img removable=1 stall=0
+ExecStart=/sbin/modprobe g_mass_storage file=/diskimage/disk.img removable=1 stall=0
 ExecStop=/sbin/modprobe -r g_mass_storage
 
 [Install]
